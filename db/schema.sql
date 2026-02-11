@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS pipeline_steps (
+  id SERIAL PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  step_type TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
