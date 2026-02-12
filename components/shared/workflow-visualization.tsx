@@ -99,6 +99,11 @@ export function WorkflowVisualization({
     forceStageActive,
     className,
 }: WorkflowVisualizationProps) {
+    // Determine which stages to display
+    const visibleStages = activeRange
+        ? stages.filter(s => s.id >= activeRange[0] && s.id <= activeRange[1])
+        : stages
+
     // If forceStageActive is provided, the effective current stage is at least that stage
     const currentStage = forceStageActive ? Math.max(propCurrentStage, forceStageActive) : propCurrentStage
 
@@ -107,6 +112,15 @@ export function WorkflowVisualization({
         if (stageId === currentStage) return 'current'
         return 'pending'
     }
+
+    // Calculate progress relative to visible stages
+    const startId = visibleStages[0]?.id || 1
+    const endId = visibleStages[visibleStages.length - 1]?.id || stages.length
+    const totalVisible = visibleStages.length
+
+    const relativeProgress = totalVisible > 1
+        ? Math.min(Math.max((currentStage - startId) / (endId - startId), 0), 1)
+        : currentStage >= startId ? 1 : 0
 
     return (
         <div className={cn('w-full', className)}>
@@ -125,30 +139,23 @@ export function WorkflowVisualization({
                     className="absolute top-5 left-0 h-0.5 bg-gradient-to-r from-primary via-blue-500 to-purple-500 transition-all duration-700 ease-out"
                     style={{
                         left: '2rem',
-                        width: `calc(${((currentStage - 1) / (stages.length - 1)) * 100}% - 4rem)`,
+                        width: `calc(${relativeProgress * 100}% - 4rem)`,
                     }}
                 />
 
                 {/* Stages */}
                 <div className="relative flex items-start justify-between">
-                    {stages.map((stage, index) => {
+                    {visibleStages.map((stage) => {
                         const status = getStageStatus(stage.id)
-                        const Icon = stageIcons[index] || FileSearch
+                        const Icon = stageIcons[stage.id - 1] || FileSearch
                         const isCompleted = status === 'completed'
                         const isCurrent = status === 'current'
                         const isPending = status === 'pending'
 
-                        const isActive = activeRange
-                            ? (stage.id >= activeRange[0] && stage.id <= activeRange[1])
-                            : true
-
                         return (
                             <div
                                 key={stage.id}
-                                className={cn(
-                                    "flex flex-col items-center transition-opacity duration-300",
-                                    !isActive && "opacity-40 grayscale-[0.5]"
-                                )}
+                                className="flex flex-col items-center transition-opacity duration-300"
                                 style={{ flex: '1 1 0' }}
                             >
                                 {/* Step Circle */}
@@ -204,15 +211,15 @@ export function WorkflowVisualization({
                         <div className="h-1.5 w-32 bg-border rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-gradient-to-r from-primary via-blue-500 to-purple-500 transition-all duration-700"
-                                style={{ width: `${((currentStage - 1) / (stages.length - 1)) * 100}%` }}
+                                style={{ width: `${relativeProgress * 100}%` }}
                             />
                         </div>
                         <span className="text-xs font-medium text-muted-foreground">
-                            {Math.round(((currentStage - 1) / (stages.length - 1)) * 100)}% Complete
+                            {Math.round(relativeProgress * 100)}% Complete
                         </span>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                        {currentStage} of {stages.length} stages
+                        {Math.min(currentStage - startId + 1, totalVisible)} of {totalVisible} stages
                     </span>
                 </div>
             </div>

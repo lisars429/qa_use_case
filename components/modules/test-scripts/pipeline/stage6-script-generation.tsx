@@ -54,12 +54,6 @@ export function PlaywrightScriptGenerator({
     //         handleGenerateScripts()
     //     }
     // }, []) // Empty dependency array to run only once on mount
-    // Auto-generate if we have inputs but no result
-    // useEffect(() => {
-    //     if (!result && !isLoading && testCases.length > 0 && domElements.length > 0) {
-    //         handleGenerateScripts()
-    //     }
-    // }, []) // Empty dependency array to run only once on mount
 
     const handleGenerateScripts = async () => {
         setIsLoading(true)
@@ -278,6 +272,32 @@ export function PlaywrightScriptGenerator({
 
             {/* Content Layout */}
             <div className="space-y-6">
+                {/* Source DOM Mapping Section */}
+                <Card className="p-6 bg-card border-border shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Globe className="w-5 h-4 text-primary" />
+                            <h3 className="text-lg font-bold text-foreground">Source DOM Mapping</h3>
+                        </div>
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                            {domElements.length} Elements
+                        </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {domElements.map((el, idx) => (
+                            <div key={idx} className="p-2.5 rounded-lg border border-border bg-secondary/10 flex flex-col gap-1 hover:border-primary/30 transition-colors">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-primary truncate max-w-[80%]">{el.id}</span>
+                                    <Sparkles className="w-2.5 h-2.5 text-primary/40" />
+                                </div>
+                                <code className="text-[9px] font-mono text-muted-foreground truncate bg-background p-1 rounded">
+                                    {el.selector}
+                                </code>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+
                 {/* Test Scenarios Section */}
                 <Card className="p-6 bg-card border-border shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
@@ -470,7 +490,11 @@ export function PlaywrightScriptGenerator({
                                                 </div>
                                             </div>
                                             <div className="pt-10 h-[600px] border border-t-0 rounded-b-xl overflow-hidden bg-[#1e1e1e]">
-                                                <CodeViewer code={test.code} language="typescript" className="h-full" />
+                                                <CodeViewer
+                                                    code={test.code}
+                                                    language={test.code.includes('import') && (test.code.includes('page:') || test.code.includes('const')) ? 'typescript' : 'python'}
+                                                    className="h-full"
+                                                />
                                             </div>
                                         </div>
                                     </div>

@@ -49,7 +49,7 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [generatedCount, setGeneratedCount] = useState(0)
     const [isTurboMode, setIsTurboMode] = useState(true)
-    const { updateUserStoryAnalysis, addScript, getDOMMapping, generatedTestCases } = usePipelineData()
+    const { updateUserStoryAnalysis, addScript, getDOMMapping, generatedTestCases, userStories, getTestCaseUserStory, generatedScripts } = usePipelineData()
 
     // Stage results
     const [userStoryInput, setUserStoryInput] = useState<UserStoryInput | null>(null)
@@ -63,36 +63,67 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
 
     // Hydrate state from context when entering specific stages
     useEffect(() => {
-        if (standaloneStage === 6) {
+        if (standaloneStage === 6 || standaloneStage === 7) {
             // Reconstruct Stage 4 result from global test cases
-            // Filter test cases that match the current userStoryId (which might be a testCaseId in standalone)
-            // If userStoryId is a testCaseId, we need to find the actual User Story or just use that single test case
+            // Try to find if userStoryId matches a test case OR a user story
+            let relevantTestCases = generatedTestCases.filter(tc =>
+                tc.test_id === userStoryId ||
+                (userStories.get(userStoryId)?.testCaseIds.includes(tc.test_id))
+            )
 
-            let relevantTestCases = generatedTestCases.filter(tc => tc.test_id === userStoryId)
+            // Find story metadata
+            const storyMeta = userStories.get(userStoryId) || getTestCaseUserStory(userStoryId)
 
-            // If no match, maybe userStoryId IS a User Story ID?
-            if (relevantTestCases.length === 0) {
-                // Try to find by user story ID logic if we had it, but for now let's assume it's a test case ID
-                // or we just grab all test cases for the story if we can find them
+            // If we found a story but no test cases yet, maybe they are in storyMeta
+            if (relevantTestCases.length === 0 && storyMeta) {
+                relevantTestCases = generatedTestCases.filter(tc =>
+                    storyMeta.testCaseIds.includes(tc.test_id)
+                )
             }
 
             if (relevantTestCases.length > 0) {
-                const testCase = relevantTestCases[0]
-                const domMapping = getDOMMapping(testCase.test_id)
+                const testCaseId = relevantTestCases[0].test_id
 
                 setStage4Result({
-                    test_cases: relevantTestCases
+                    test_cases: relevantTestCases,
+                    summary: `Recovered ${relevantTestCases.length} test cases for ${userStoryId}`
                 })
 
+                const domMapping = getDOMMapping(userStoryId) || getDOMMapping(testCaseId)
                 if (domMapping) {
                     setStage5Result(domMapping)
                 }
 
-                // Also try to populate rules if we can (harder without full hydration)
-                // But at least we have TCs and DOM
+                if (storyMeta) {
+                    setUserStoryInput(storyMeta.userStory)
+                    setStage1Result(storyMeta.stage1Result || null)
+                    setStage2Result(storyMeta.stage2Result || null)
+                    setStage3Result(storyMeta.stage3Result || null)
+                    setStage7Result(storyMeta.stage7Result || null)
+                }
+            }
+
+            // Hydrate scripts for Stage 6/7
+            const scriptsForThisStory = generatedScripts.filter(gs => {
+                if (gs.testCaseId === userStoryId) return true
+                if (storyMeta && storyMeta.testCaseIds.includes(gs.testCaseId)) return true
+                return false
+            })
+
+            console.log('PipelineUnified: Hydrating scripts for', userStoryId, 'Found:', scriptsForThisStory.length)
+
+            if (scriptsForThisStory.length > 0) {
+                const pws: PlaywrightScripts = {
+                    scripts: scriptsForThisStory.map(s => s.script),
+                    setup_instructions: ["Run naturally via the pipeline executor."],
+                    summary: `Ready to execute ${scriptsForThisStory.length} scripts.`
+                }
+                setStage6Result(pws)
+            } else if (standaloneStage === 7) {
+                console.warn('PipelineUnified: No scripts found during hydration for Stage 7')
             }
         }
-    }, [standaloneStage, userStoryId, generatedTestCases, getDOMMapping])
+    }, [standaloneStage, userStoryId, generatedTestCases, getDOMMapping, userStories, getTestCaseUserStory, generatedScripts])
 
     const handleStage1Complete = async (result: TestabilityInsight, input: UserStoryInput) => {
         setStage1Result(result)
@@ -232,7 +263,8 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
 
     const handleStage7Complete = (result: ExecutionResults) => {
         setStage7Result(result)
-        // Pipeline complete
+        // Save to global context for persistence across modules
+        updateUserStoryAnalysis(userStoryId, { stage7: result })
     }
 
     return (
@@ -294,7 +326,7 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                     Stage 5: DOM Mapping
                                 </TabsTrigger>
                             ) : null}
-                            {(!standaloneStage || standaloneStage === 6 || standaloneStage === 7) && isWithinRange(6) && (
+                            {(!standaloneStage || standaloneStage === 6) && isWithinRange(6) && (
                                 <TabsTrigger
                                     value="stage6"
                                     className="data-[state=active]:bg-secondary"
@@ -303,7 +335,16 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                     Stage 6: Scripts
                                 </TabsTrigger>
                             )}
-                            {(!standaloneStage || standaloneStage === 7) && isWithinRange(7) && (
+                            {(standaloneStage === 7) && isWithinRange(7) && (
+                                <TabsTrigger
+                                    value="stage7"
+                                    className="data-[state=active]:bg-secondary"
+                                    disabled={currentStage < 7}
+                                >
+                                    Stage 7: Execution
+                                </TabsTrigger>
+                            )}
+                            {(!standaloneStage) && isWithinRange(7) && (
                                 <TabsTrigger
                                     value="stage7"
                                     className="data-[state=active]:bg-secondary"

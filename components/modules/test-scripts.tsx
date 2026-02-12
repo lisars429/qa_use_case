@@ -37,21 +37,23 @@ interface TestScriptsModuleProps {
     view?: 'pipeline' | 'explorer'
     stage?: number
     testCaseId?: string
+    userStoryId?: string
   }
+  onModuleChange?: (module: 'user-stories' | 'test-cases' | 'test-scripts' | 'execution' | 'insights', state?: any) => void
 }
 
-export function TestScriptsModule({ initialState }: TestScriptsModuleProps) {
+export function TestScriptsModule({ initialState, onModuleChange }: TestScriptsModuleProps) {
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<string | null>(initialState?.testCaseId || null)
-  const [showPipeline, setShowPipeline] = useState(initialState?.view === 'pipeline')
-  const { generatedScripts, getTestCaseUserStory } = usePipelineData()
+  const [selectedUserStoryId, setSelectedUserStoryId] = useState<string | null>(initialState?.userStoryId || null)
+  const { generatedScripts, getTestCaseUserStory, userStories } = usePipelineData()
 
   // Verify if we need to auto-trigger generation or setup based on initialState
   useEffect(() => {
-    if (initialState?.view === 'pipeline') {
-      setShowPipeline(true)
-    }
     if (initialState?.testCaseId) {
       setSelectedTestCaseId(initialState.testCaseId)
+    }
+    if (initialState?.userStoryId) {
+      setSelectedUserStoryId(initialState.userStoryId)
     }
   }, [initialState])
 
@@ -82,76 +84,28 @@ export function TestScriptsModule({ initialState }: TestScriptsModuleProps) {
     })
   }, [generatedScripts, getTestCaseUserStory])
 
-  const selectedScript = useMemo(() => {
-    if (!selectedTestCaseId) return null
-    return scripts.find(s => s.testCaseId === selectedTestCaseId) || null
-  }, [selectedTestCaseId, scripts])
-
-  const handleRunScript = async (scriptId: string) => {
-    console.log('Running script:', scriptId)
-    await saveActivity(`Run Script ${scriptId}`, 'test_script_execution', { scriptId })
-  }
-
-  if (showPipeline) {
-    return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Automation Pipeline</h2>
-          <Button onClick={() => setShowPipeline(false)} variant="outline">
-            Exit to Dashboard
-          </Button>
-        </div>
-
-        <div className="px-2">
-          <PipelineUnified
-            userStoryId={selectedTestCaseId || 'tc-001'}
-            onModuleChange={(module) => {
-              if (module === 'execution') {
-                setShowPipeline(false)
-              }
-            }}
-            standaloneStage={6}
-            initialData={{
-              user_story: scripts.find(s => s.testCaseId === selectedTestCaseId)?.name || 'AI Generated Test',
-            }}
-          />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between bg-card p-6 rounded-xl border border-border shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold">Test Scripts</h2>
+          <h2 className="text-2xl font-bold">Automation Pipeline</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {scripts.length} total scripts configured
+            Generate and execute automation scripts for your test cases
           </p>
         </div>
-        <Button
-          onClick={() => setShowPipeline(true)}
-          className="gap-2"
-        >
-          <Play className="w-4 h-4" />
-          Launch Pipeline
-        </Button>
       </div>
 
-      <div className="grid grid-cols-5 gap-6 h-[calc(100vh-18rem)]">
-        <Card className="col-span-2 overflow-hidden border-border">
-          <HierarchyView
-            scripts={scripts}
-            selectedTestCaseId={selectedTestCaseId}
-            onTestCaseSelect={setSelectedTestCaseId}
-          />
-        </Card>
-        <Card className="col-span-3 p-6 overflow-y-auto border-border">
-          <DetailsPanel
-            script={selectedScript}
-            onRun={handleRunScript}
-          />
-        </Card>
+      <div className="px-2">
+        <PipelineUnified
+          userStoryId={selectedUserStoryId || selectedTestCaseId || 'tc-001'}
+          onModuleChange={(module) => {
+            if (onModuleChange) onModuleChange(module)
+          }}
+          standaloneStage={6}
+          initialData={{
+            user_story: (selectedUserStoryId ? userStories.get(selectedUserStoryId)?.userStory.user_story : scripts.find(s => s.testCaseId === selectedTestCaseId)?.name) || 'AI Generated Test',
+          }}
+        />
       </div>
     </div>
   )

@@ -28,10 +28,18 @@ export function ExpandableCard({
 
     return (
         <Card className={cn('bg-card border-border overflow-hidden', className)}>
-            <button
+            <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setIsExpanded(!isExpanded)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setIsExpanded(!isExpanded)
+                    }
+                }}
                 className={cn(
-                    'w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors',
+                    'w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                     headerClassName
                 )}
             >
@@ -50,7 +58,7 @@ export function ExpandableCard({
                         isExpanded && 'transform rotate-180'
                     )}
                 />
-            </button>
+            </div>
 
             <div
                 className={cn(

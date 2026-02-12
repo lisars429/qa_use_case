@@ -57,7 +57,7 @@ export function TestCasesModule({ initialState, onModuleChange }: TestCasesModul
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'all' | 'generated' | 'internal'>('all')
   const [expandedTestCaseId, setExpandedTestCaseId] = useState<string | null>(null)
-  const [showDOMMappingForId, setShowDOMMappingForId] = useState<string | null>(null)
+  const [showDOMMappingForStoryId, setShowDOMMappingForStoryId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -511,28 +511,89 @@ export function TestCasesModule({ initialState, onModuleChange }: TestCasesModul
             return (
               <AccordionItem key={storyId} value={storyId} className="border-none">
                 <Card className="overflow-hidden border-border bg-card hover:border-primary/30 transition-all duration-300">
-                  <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-secondary/20 group">
-                    <div className="flex items-center gap-4 text-left w-full mr-4">
-                      <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                        <Sparkles className="w-4 h-4 text-primary" />
+                  <div className="flex items-center justify-between hover:bg-secondary/20 group">
+                    <AccordionTrigger className="flex-1 px-6 py-4 hover:no-underline border-none">
+                      <div className="flex items-center gap-4 text-left w-full mr-4">
+                        <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                          <Sparkles className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground truncate">{storyTitle}</h3>
+                          <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                            <span className="font-mono text-accent/70">{storyId}</span>
+                            <span className="opacity-30">•</span>
+                            <span>{cases.length} test cases</span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{storyTitle}</h3>
-                        <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                          <span className="font-mono text-accent/70">{storyId}</span>
-                          <span className="opacity-30">•</span>
-                          <span>{cases.length} test cases</span>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 mr-4">
-                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10">
-                          {Math.round(cases.filter(c => c.status === 'active').length / cases.length * 100)}% Ready
-                        </Badge>
-                      </div>
+                    </AccordionTrigger>
+                    <div className="flex items-center gap-2 mr-10 shrink-0">
+                      {getDOMMapping(storyId) ? (
+                        <>
+                          <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 flex items-center gap-1 hidden md:flex">
+                            <CheckCircle2 className="w-3 h-3" /> Mapped
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs bg-accent/10 text-accent border-accent/10 hover:bg-accent/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onModuleChange?.('test-scripts', {
+                                view: 'pipeline',
+                                stage: 6,
+                                userStoryId: storyId
+                              })
+                            }}
+                          >
+                            <Zap className="w-3 h-3 mr-1" /> Generate Scripts
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs bg-primary/5 text-primary border-primary/10 hover:bg-primary/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDOMMappingForStoryId(storyId);
+                          }}
+                        >
+                          <Globe className="w-3 h-3 mr-1" /> Map Story
+                        </Button>
+                      )}
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 hidden sm:flex">
+                        {Math.round(cases.filter(c => c.status === 'active').length / cases.length * 100)}% Ready
+                      </Badge>
                     </div>
-                  </AccordionTrigger>
+                  </div>
 
                   <AccordionContent className="p-0 border-t border-border">
+                    {showDOMMappingForStoryId === storyId && (
+                      <div className="p-6 bg-secondary/10 border-b border-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">User Story DOM Mapping</h4>
+                          <Button variant="ghost" size="sm" onClick={() => setShowDOMMappingForStoryId(null)}>
+                            <X className="w-4 h-4 mr-2" /> Close Mapper
+                          </Button>
+                        </div>
+                        <Stage5DOMMapping.Mapper
+                          testCaseIds={cases.map(c => c.test_id)}
+                          onMappingComplete={(result) => {
+                            addDOMMapping(storyId, result)
+                          }}
+                          initialResult={getDOMMapping(storyId) || undefined}
+                          onProceed={() => {
+                            setShowDOMMappingForStoryId(null)
+                            onModuleChange?.('test-scripts', {
+                              view: 'pipeline',
+                              stage: 6,
+                              userStoryId: storyId
+                            })
+                          }}
+                        />
+                      </div>
+                    )}
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -713,45 +774,7 @@ export function TestCasesModule({ initialState, onModuleChange }: TestCasesModul
 
 
 
-              {/* DOM Mapping Section - Inline */}
-              {showDOMMappingForId === expandedTestCaseId && (
-                <div className="pt-8 mt-8 border-t border-border">
-                  <div className="mb-4">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">DOM Element Mapping</h4>
-                  </div>
-                  <Stage5DOMMapping.Mapper
-                    testCaseIds={[expandedTestCaseId]}
-                    onMappingComplete={(result) => {
-                      addDOMMapping(expandedTestCaseId, result)
-                    }}
-                    initialResult={getDOMMapping(expandedTestCaseId) || undefined}
-                    onProceed={() => {
-                      console.log('TestCasesModule: onProceed called', {
-                        testCaseId: expandedTestCaseId
-                      })
-                      onModuleChange?.('test-scripts', {
-                        view: 'pipeline',
-                        stage: 6,
-                        testCaseId: expandedTestCaseId
-                      })
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* DOM Mapping Button - Show when not expanded */}
-              {!showDOMMappingForId && (
-                <div className="flex justify-center pt-4">
-                  <Button
-                    size="lg"
-                    className="bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground border border-primary/20 transition-all duration-300"
-                    onClick={() => setShowDOMMappingForId(expandedTestCaseId)}
-                  >
-                    <Globe className="w-4 h-4 mr-2" />
-                    Map DOM Elements
-                  </Button>
-                </div>
-              )}
+              {/* DOM Mapping Section - removed from here as it is now at story level */}
             </div>
           </div>
         </Card>

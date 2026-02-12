@@ -33,9 +33,9 @@ export default function Home() {
       case 'test-cases':
         return <TestCasesModule initialState={moduleState} onModuleChange={handleModuleChange} />
       case 'test-scripts':
-        return <TestScriptsModule initialState={moduleState} />
+        return <TestScriptsModule initialState={moduleState} onModuleChange={handleModuleChange} />
       case 'execution':
-        return <TestExecutionModule />
+        return <TestExecutionModule initialState={moduleState} onModuleChange={handleModuleChange} />
       case 'insights':
         return <InsightsModule />
       default:

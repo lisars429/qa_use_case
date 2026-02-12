@@ -35,6 +35,7 @@ interface UserStoryMetadata {
     stage1Result?: TestabilityInsight
     stage2Result?: RuleAuditResult
     stage3Result?: AmbiguityClassification
+    stage7Result?: ExecutionResults
 }
 
 interface PipelineDataContextType {
@@ -47,6 +48,7 @@ interface PipelineDataContextType {
             stage1?: TestabilityInsight
             stage2?: RuleAuditResult
             stage3?: AmbiguityClassification
+            stage7?: ExecutionResults
             userStory?: UserStoryInput
         }
     ) => void
@@ -70,10 +72,10 @@ interface PipelineDataContextType {
     addExecutionResult: (scriptId: string, result: ExecutionResults) => void
     getExecutionResult: (scriptId: string) => ExecutionResults | undefined
 
-    // DOM mappings from Stage 5
+    // DOM mappings from Stage 5 - key is userStoryId
     domMappings: Map<string, DOMMappingResult>
-    addDOMMapping: (testCaseId: string, mapping: DOMMappingResult) => void
-    getDOMMapping: (testCaseId: string) => DOMMappingResult | undefined
+    addDOMMapping: (storyId: string, mapping: DOMMappingResult) => void
+    getDOMMapping: (id: string) => DOMMappingResult | undefined
 }
 
 const PipelineDataContext = createContext<PipelineDataContextType | undefined>(undefined)
@@ -115,6 +117,7 @@ export function PipelineDataProvider({ children }: { children: ReactNode }) {
             stage1?: TestabilityInsight
             stage2?: RuleAuditResult
             stage3?: AmbiguityClassification
+            stage7?: ExecutionResults
             userStory?: UserStoryInput
         }
     ) => {
@@ -130,6 +133,7 @@ export function PipelineDataProvider({ children }: { children: ReactNode }) {
                 stage1Result: analysis.stage1 || existing.stage1Result,
                 stage2Result: analysis.stage2 || existing.stage2Result,
                 stage3Result: analysis.stage3 || existing.stage3Result,
+                stage7Result: analysis.stage7 || existing.stage7Result,
                 userStory: analysis.userStory || existing.userStory,
             })
             return newMap
@@ -229,12 +233,21 @@ export function PipelineDataProvider({ children }: { children: ReactNode }) {
         return generatedScripts.find(s => s.id === scriptId)?.executionResult
     }
 
-    const addDOMMapping = (testCaseId: string, mapping: DOMMappingResult) => {
-        setDOMMappings(prev => new Map(prev).set(testCaseId, mapping))
+    const addDOMMapping = (storyId: string, mapping: DOMMappingResult) => {
+        setDOMMappings(prev => new Map(prev).set(storyId, mapping))
     }
 
-    const getDOMMapping = (testCaseId: string) => {
-        return domMappings.get(testCaseId)
+    const getDOMMapping = (id: string) => {
+        // Try as story ID first
+        const storyMapping = domMappings.get(id)
+        if (storyMapping) return storyMapping
+
+        // If not found, check if it's a test case ID and get its story mapping
+        const storyMeta = getTestCaseUserStory(id)
+        if (storyMeta) {
+            return domMappings.get(storyMeta.userStoryId)
+        }
+        return undefined
     }
 
     const value: PipelineDataContextType = {
