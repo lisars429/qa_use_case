@@ -97,13 +97,11 @@ export function TestScriptsModule({ initialState, onModuleChange }: TestScriptsM
 
       <div className="px-2">
         <PipelineUnified
-          userStoryId={selectedUserStoryId || selectedTestCaseId || 'tc-001'}
-          onModuleChange={(module) => {
-            if (onModuleChange) onModuleChange(module)
-          }}
+          userStoryId={selectedUserStoryId || selectedTestCaseId || (userStories.size > 0 ? Array.from(userStories.keys())[0] : 'us-001')}
+          onModuleChange={onModuleChange}
           standaloneStage={6}
           initialData={{
-            user_story: (selectedUserStoryId ? userStories.get(selectedUserStoryId)?.userStory.user_story : scripts.find(s => s.testCaseId === selectedTestCaseId)?.name) || 'AI Generated Test',
+            user_story: (selectedUserStoryId ? userStories.get(selectedUserStoryId)?.userStory.user_story : (selectedTestCaseId ? scripts.find(s => s.testCaseId === selectedTestCaseId)?.userStoryTitle : Array.from(userStories.values())[0]?.userStory.user_story)) || 'AI Generated Test',
           }}
         />
       </div>

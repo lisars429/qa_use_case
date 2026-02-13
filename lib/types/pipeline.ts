@@ -122,6 +122,7 @@ export interface TestCaseGenerationInput {
   explicit_behaviors?: string[]
   resolved_clarifications?: string
   enriched_context?: string
+  dom_context?: DOMElement[]
 }
 
 export type TestType = 'Happy Path' | 'Validation' | 'Negative'

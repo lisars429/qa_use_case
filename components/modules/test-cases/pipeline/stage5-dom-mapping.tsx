@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Loader2, Globe, CheckCircle2, Copy, Search } from 'lucide-react'
+import { Loader2, Globe, CheckCircle2, Copy, Search, RotateCcw } from 'lucide-react'
 import type { DOMMappingResult, DOMElement } from '@/lib/types/pipeline'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,8 @@ export interface DOMMappingProps {
     onMappingComplete: (result: DOMMappingResult) => void
     initialResult?: DOMMappingResult
     onProceed?: () => void
+    isTurboMode?: boolean
+    onRegenerate?: () => void
 }
 
 export function DOMMapping({
@@ -28,6 +30,8 @@ export function DOMMapping({
     onMappingComplete,
     initialResult,
     onProceed,
+    isTurboMode,
+    onRegenerate,
 }: DOMMappingProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [result, setResult] = useState<DOMMappingResult | null>(initialResult || null)
@@ -35,6 +39,12 @@ export function DOMMapping({
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
     const [activeTab, setActiveTab] = useState('all')
+
+    useEffect(() => {
+        if (isTurboMode && !result && !isLoading && url) {
+            handleMapDOM()
+        }
+    }, [isTurboMode, result, isLoading, url])
 
     const handleMapDOM = async () => {
         setIsLoading(true)
@@ -110,6 +120,13 @@ export function DOMMapping({
 
             setResult(mockResult)
             onMappingComplete(mockResult)
+
+            if (isTurboMode && onProceed) {
+                const timer = setTimeout(() => {
+                    onProceed()
+                }, 1500)
+                return () => clearTimeout(timer)
+            }
         } catch (error) {
             console.error('Failed to map DOM:', error)
         } finally {
@@ -413,20 +430,33 @@ export function DOMMapping({
 
             {/* Proceed Button */}
             {/* Proceed Button */}
-            <Button
-                className="w-full bg-primary text-primary-foreground"
-                onClick={() => {
-                    console.log('DOMMapping: Proceed button clicked')
-                    if (onProceed) {
-                        onProceed()
-                    } else {
-                        console.warn('DOMMapping: onProceed prop is undefined')
-                    }
-                }}
-            >
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Proceed to Stage 6: Script Generation
-            </Button>
+            {/* Proceed Button */}
+            <div className="flex gap-3">
+                <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                        if (onRegenerate) onRegenerate()
+                    }}
+                >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Regenerate Test Cases
+                </Button>
+                <Button
+                    className="flex-1 bg-primary text-primary-foreground"
+                    onClick={() => {
+                        console.log('DOMMapping: Proceed button clicked')
+                        if (onProceed) {
+                            onProceed()
+                        } else {
+                            console.warn('DOMMapping: onProceed prop is undefined')
+                        }
+                    }}
+                >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Proceed to Stage 6
+                </Button>
+            </div>
         </div>
     )
 }

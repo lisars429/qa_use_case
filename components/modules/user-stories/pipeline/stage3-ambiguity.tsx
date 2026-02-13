@@ -53,8 +53,10 @@ export function AmbiguityClassification({
             }
             const classificationResult = await api.classifyAmbiguities(input)
             setResult(classificationResult)
-            // Removed automatic completion to allow for manual review before proceeding
-            // onClassificationComplete(classificationResult)
+            if (isTurboMode) {
+                // In Turbo Mode, automatically proceed to next stage
+                onClassificationComplete(classificationResult, true)
+            }
         } catch (error) {
             console.error('Failed to classify ambiguities:', error)
         } finally {

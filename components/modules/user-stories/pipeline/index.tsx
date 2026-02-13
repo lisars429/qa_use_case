@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { WorkflowVisualization } from '@/components/shared'
 import { Stage1Testability } from './stage1-testability'
 import { Stage2RuleGrounding } from './stage2-rule-grounding'
@@ -40,15 +41,26 @@ interface PipelineUnifiedProps {
     activeRange?: [number, number]
     standaloneStage?: number
     onModuleChange?: (module: 'user-stories' | 'test-cases' | 'test-scripts' | 'execution' | 'insights', state?: any) => void
+    isTurboMode?: boolean
 }
 
-export function PipelineUnified({ userStoryId, initialData, activeRange, standaloneStage, onModuleChange }: PipelineUnifiedProps) {
+export function PipelineUnified({ userStoryId, initialData, activeRange, standaloneStage, onModuleChange, isTurboMode: isTurboModeProp }: PipelineUnifiedProps) {
     const initialStage = standaloneStage || (activeRange ? activeRange[0] : 1)
     const [currentStage, setCurrentStage] = useState(initialStage)
     const [activeTab, setActiveTab] = useState(`stage${initialStage}`)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [generatedCount, setGeneratedCount] = useState(0)
-    const [isTurboMode, setIsTurboMode] = useState(true)
+    const [isTurboMode, setIsTurboMode] = useState(isTurboModeProp ?? true)
+    const [shouldAutoRunStage2, setShouldAutoRunStage2] = useState(false)
+    const [regenerationMode, setRegenerationMode] = useState(false)
+    const [iterationCount, setIterationCount] = useState(0)
+
+    // Track if prop changes
+    useEffect(() => {
+        if (isTurboModeProp !== undefined) {
+            setIsTurboMode(isTurboModeProp)
+        }
+    }, [isTurboModeProp])
     const { updateUserStoryAnalysis, addScript, getDOMMapping, generatedTestCases, userStories, getTestCaseUserStory, generatedScripts } = usePipelineData()
 
     // Stage results
@@ -105,8 +117,13 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
 
             // Hydrate scripts for Stage 6/7
             const scriptsForThisStory = generatedScripts.filter(gs => {
-                if (gs.testCaseId === userStoryId) return true
-                if (storyMeta && storyMeta.testCaseIds.includes(gs.testCaseId)) return true
+                const caseId = gs.testCaseId
+                if (caseId === userStoryId) return true
+                if (storyMeta && storyMeta.testCaseIds.includes(caseId)) return true
+
+                // Fallback: Check if the test case ID starts with the user story ID
+                if (caseId.startsWith(userStoryId)) return true
+
                 return false
             })
 
@@ -150,6 +167,7 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
 
     const handleStage2Complete = async (result: RuleAuditResult) => {
         setStage2Result(result)
+        setShouldAutoRunStage2(false)
 
         // Save to DB
         await saveActivity(
@@ -163,11 +181,15 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
             }
         )
 
-        setCurrentStage(3)
-        setActiveTab('stage3')
-
         // Save to global context
         updateUserStoryAnalysis(userStoryId, { stage2: result })
+
+        // Only auto-advance if there are no clarification questions and rules are complete
+        // Otherwise, stay on Stage 2 to allow for refinement
+        if (result.clarification_questions.length === 0 && result.rule_status === 'Likely Rule-Complete') {
+            setCurrentStage(3)
+            setActiveTab('stage3')
+        }
     }
 
     const handleRefinementComplete = (result: RequirementRefinementResult) => {
@@ -181,6 +203,8 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
         }
         // Reset stage 2 to re-run with refined data
         setStage2Result(null)
+        setShouldAutoRunStage2(true)
+        setIterationCount(prev => prev + 1)
     }
 
     const handleStage3Complete = async (result: AmbiguityClassificationType, forceProceed = false) => {
@@ -229,6 +253,12 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
         setActiveTab('stage5')
     }
 
+    const handleStage5Regenerate = () => {
+        setRegenerationMode(true)
+        setCurrentStage(4)
+        setActiveTab('stage4')
+    }
+
     const handleStage5Complete = (result: DOMMappingResult) => {
         setStage5Result(result)
         setCurrentStage(6)
@@ -251,14 +281,16 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
             })
         })
 
-        setCurrentStage(7)
-        setActiveTab('stage7')
+        // REMOVED: Auto-navigation to stage7 - users should review/edit scripts first
+        // setCurrentStage(7)
+        // setActiveTab('stage7')
 
+        // REMOVED: Standalone mode auto-navigation - users should review/edit scripts first
         // If we are in standalone Stage 6 mode (launched from Test Scripts)
         // Transition to execution module after scripts are generated
-        if (standaloneStage === 6 && onModuleChange) {
-            onModuleChange('execution', { userStoryId, scripts: result.scripts })
-        }
+        // if (standaloneStage === 6 && onModuleChange) {
+        //     onModuleChange('execution', { userStoryId, scripts: result.scripts })
+        // }
     }
 
     const handleStage7Complete = (result: ExecutionResults) => {
@@ -377,11 +409,16 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                 <Stage1Testability.InputForm
                                     onAnalysisComplete={handleStage1Complete}
                                     initialData={initialData}
+                                    isTurboMode={isTurboMode}
                                 />
                             ) : (
                                 <Stage1Testability.Results
                                     result={stage1Result}
-                                    onProceed={() => setActiveTab('stage2')}
+                                    onProceed={() => {
+                                        setCurrentStage(2)
+                                        setActiveTab('stage2')
+                                    }}
+                                    isTurboMode={isTurboMode}
                                 />
                             )}
                         </TabsContent>
@@ -396,6 +433,7 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                         onAnalysisComplete={handleStage2Complete}
                                         initialResult={stage2Result || undefined}
                                         isTurboMode={isTurboMode}
+                                        autoRun={shouldAutoRunStage2}
                                     />
 
                                     {stage2Result && stage2Result.clarification_questions.length > 0 && (
@@ -403,7 +441,24 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                             userStoryInput={userStoryInput}
                                             clarificationQuestions={stage2Result.clarification_questions}
                                             onRefinementComplete={handleRefinementComplete}
+                                            iterationCount={iterationCount}
                                         />
+                                    )}
+
+                                    {/* Manual Proceed Button for when auto-advance is blocked */}
+                                    {stage2Result && (stage2Result.clarification_questions.length > 0 || stage2Result.rule_status !== 'Likely Rule-Complete') && (
+                                        <div className="flex justify-end">
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    setCurrentStage(3)
+                                                    setActiveTab('stage3')
+                                                }}
+                                                className="text-muted-foreground hover:text-foreground"
+                                            >
+                                                Proceed to Stage 3 (Skip Refinement) &rarr;
+                                            </Button>
+                                        </div>
                                     )}
                                 </>
                             )}
@@ -432,6 +487,18 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                     onGenerationComplete={handleStage4Complete}
                                     initialResult={stage4Result || undefined}
                                     userStoryId={userStoryId}
+                                    onProceed={() => {
+                                        setCurrentStage(5)
+                                        setActiveTab('stage5')
+                                    }}
+                                    isTurboMode={isTurboMode}
+                                    enrichedContext={stage3Result?.clarification_items
+                                        .filter(item => item.resolution_answer)
+                                        .map(item => `Q: ${item.question}\nA: ${item.resolution_answer}`)
+                                        .join('\n\n') || undefined
+                                    }
+                                    domContext={regenerationMode ? stage5Result?.elements : undefined}
+                                    regenerationMode={regenerationMode}
                                 />
                             )}
                         </TabsContent>
@@ -442,6 +509,12 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                 testCaseIds={stage4Result?.test_cases.map(tc => tc.test_id) || []}
                                 onMappingComplete={handleStage5Complete}
                                 initialResult={stage5Result || undefined}
+                                onProceed={() => {
+                                    setCurrentStage(6)
+                                    setActiveTab('stage6')
+                                }}
+                                isTurboMode={isTurboMode}
+                                onRegenerate={handleStage5Regenerate}
                             />
                         </TabsContent>
 
@@ -461,7 +534,16 @@ export function PipelineUnified({ userStoryId, initialData, activeRange, standal
                                     xpath: e.xpath || ''
                                 })) || []}
                                 onGenerationComplete={handleStage6Complete}
+                                onProceed={() => {
+                                    if (standaloneStage === 6 && onModuleChange) {
+                                        onModuleChange('execution', { userStoryId, scripts: stage6Result?.scripts })
+                                    } else {
+                                        setCurrentStage(7)
+                                        setActiveTab('stage7')
+                                    }
+                                }}
                                 initialResult={stage6Result || undefined}
+                                isTurboMode={isTurboMode}
                             />
                         </TabsContent>
 

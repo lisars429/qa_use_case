@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,15 +20,27 @@ import { cn } from '@/lib/utils'
 interface UserStoryInputFormProps {
     onAnalysisComplete: (result: TestabilityInsight, input: UserStoryInput) => void
     initialData?: Partial<UserStoryInput>
+    isTurboMode?: boolean
 }
 
-export function UserStoryInputForm({ onAnalysisComplete, initialData }: UserStoryInputFormProps) {
+export function UserStoryInputForm({ onAnalysisComplete, initialData, isTurboMode }: UserStoryInputFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [formData, setFormData] = useState<UserStoryInput>({
         user_story: initialData?.user_story || '',
         detailed_description: initialData?.detailed_description || '',
         acceptance_criteria: initialData?.acceptance_criteria || '',
     })
+    const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false)
+
+    useEffect(() => {
+        if (isTurboMode && formData.user_story.trim() && !hasAutoSubmitted && !isLoading) {
+            setHasAutoSubmitted(true)
+            const timer = setTimeout(() => {
+                handleSubmit({ preventDefault: () => { } } as React.FormEvent)
+            }, 800)
+            return () => clearTimeout(timer)
+        }
+    }, [isTurboMode, formData.user_story, hasAutoSubmitted, isLoading])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -116,7 +128,7 @@ export function UserStoryInputForm({ onAnalysisComplete, initialData }: UserStor
                     ) : (
                         <>
                             <Sparkles className="w-4 h-4 mr-2" />
-                            Analyze Stage 1
+                            {isTurboMode ? 'Auto Analyze' : 'Analyze Stage 1'}
                         </>
                     )}
                 </Button>
@@ -132,10 +144,20 @@ export function UserStoryInputForm({ onAnalysisComplete, initialData }: UserStor
 interface TestabilityResultsProps {
     result: TestabilityInsight
     onProceed?: () => void
+    isTurboMode?: boolean
 }
 
-export function TestabilityResults({ result, onProceed }: TestabilityResultsProps) {
+export function TestabilityResults({ result, onProceed, isTurboMode }: TestabilityResultsProps) {
     const [activeTab, setActiveTab] = useState('behaviors')
+
+    useEffect(() => {
+        if (isTurboMode && onProceed && result.testability_status === 'Likely Test-Ready') {
+            const timer = setTimeout(() => {
+                onProceed()
+            }, 1500) // Delay to let user see the result
+            return () => clearTimeout(timer)
+        }
+    }, [isTurboMode, onProceed, result.testability_status])
 
     const handleDownload = () => {
         const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })

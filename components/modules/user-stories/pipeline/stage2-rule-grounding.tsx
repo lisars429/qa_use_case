@@ -24,6 +24,7 @@ interface RuleGroundingAnalysisProps {
     onAnalysisComplete: (result: RuleAuditResult) => void
     initialResult?: RuleAuditResult
     isTurboMode?: boolean
+    autoRun?: boolean
 }
 
 export function RuleGroundingAnalysis({
@@ -32,16 +33,17 @@ export function RuleGroundingAnalysis({
     onAnalysisComplete,
     initialResult,
     isTurboMode,
+    autoRun,
 }: RuleGroundingAnalysisProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [result, setResult] = useState<RuleAuditResult | null>(initialResult || null)
     const [activeTab, setActiveTab] = useState('rules')
 
     useEffect(() => {
-        if (isTurboMode && !result && !isLoading) {
+        if ((isTurboMode || autoRun) && !result && !isLoading) {
             handleRunAnalysis()
         }
-    }, [isTurboMode, result, isLoading])
+    }, [isTurboMode, autoRun, result, isLoading])
 
     const handleRunAnalysis = async () => {
         setIsLoading(true)
@@ -245,15 +247,16 @@ interface RequirementRefinementProps {
     userStoryInput: UserStoryInput
     clarificationQuestions: string[]
     onRefinementComplete: (result: RequirementRefinementResult) => void
+    iterationCount: number
 }
 
 export function RequirementRefinement({
     userStoryInput,
     clarificationQuestions,
     onRefinementComplete,
+    iterationCount,
 }: RequirementRefinementProps) {
     const [isLoading, setIsLoading] = useState(false)
-    const [iterationCount, setIterationCount] = useState(0)
     const [answers, setAnswers] = useState<Record<number, string>>({})
 
     const handleAnswerChange = (index: number, value: string) => {
@@ -277,7 +280,6 @@ export function RequirementRefinement({
                 clarifications,
             }
             const result = await api.refineRequirements(input)
-            setIterationCount(prev => prev + 1)
             onRefinementComplete(result)
             setAnswers({})
         } catch (error) {

@@ -9,7 +9,7 @@ import { ExpandableCard, StatusBadge } from '@/components/shared'
 import { Loader2, FileText, CheckCircle2, Download, Plus } from 'lucide-react'
 import { api } from '@/lib/api/client'
 import { usePipelineData } from '@/lib/context/pipeline-data-context'
-import type { TestCaseGenerationInput, TestScenarios, TestCase } from '@/lib/types/pipeline'
+import type { TestCaseGenerationInput, TestScenarios, TestCase, DOMElement } from '@/lib/types/pipeline'
 import { cn } from '@/lib/utils'
 
 // ============================================================================
@@ -28,6 +28,10 @@ interface TestCaseGeneratorProps {
     initialResult?: TestScenarios
     userStoryId?: string
     isTurboMode?: boolean
+    onProceed?: () => void
+    regenerationMode?: boolean
+    enrichedContext?: string
+    domContext?: DOMElement[]
 }
 
 export function TestCaseGenerator({
@@ -38,6 +42,10 @@ export function TestCaseGenerator({
     initialResult,
     userStoryId,
     isTurboMode,
+    onProceed,
+    regenerationMode,
+    enrichedContext,
+    domContext,
 }: TestCaseGeneratorProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [result, setResult] = useState<TestScenarios | null>(initialResult || null)
@@ -56,7 +64,8 @@ export function TestCaseGenerator({
             const input: TestCaseGenerationInput = {
                 user_story: userStoryInput.user_story,
                 explicit_rules: stage2Rules || [],
-                enriched_context: userStoryInput.detailed_description,
+                enriched_context: enrichedContext || userStoryInput.detailed_description,
+                dom_context: domContext,
             }
             const generatedResult = await api.generateTestCases(input)
             setResult(generatedResult)
@@ -68,6 +77,13 @@ export function TestCaseGenerator({
                 userStoryId || 'unknown',
                 userStoryInput
             )
+
+            if (isTurboMode && onProceed) {
+                const timer = setTimeout(() => {
+                    onProceed()
+                }, 1500)
+                return () => clearTimeout(timer)
+            }
         } catch (error) {
             console.error('Failed to generate test cases:', error)
         } finally {
@@ -179,6 +195,30 @@ export function TestCaseGenerator({
     return (
         <div className="space-y-4">
             {/* Header with Summary */}
+            {regenerationMode && (
+                <Card className="p-4 bg-purple-500/10 border-2 border-purple-500/20 mb-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-purple-500/20">
+                            <CheckCircle2 className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-foreground">DOM Context Available</h4>
+                            <p className="text-sm text-muted-foreground">
+                                {domContext?.length || 0} elements mapped. Regenerate test cases to align with actual application selectors.
+                            </p>
+                        </div>
+                        <Button
+                            className="ml-auto bg-purple-600 hover:bg-purple-700 text-white"
+                            onClick={handleGenerateTestCases}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
+                            Regenerate with DOM
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
             <Card className="p-4 bg-green-500/5 border-2 border-green-500/20">
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -290,7 +330,12 @@ export function TestCaseGenerator({
             </Card>
 
             {/* Proceed Button */}
-            <Button className="w-full bg-primary text-primary-foreground">
+            <Button
+                className="w-full bg-primary text-primary-foreground"
+                onClick={() => {
+                    if (onProceed) onProceed()
+                }}
+            >
                 <CheckCircle2 className="w-4 h-4 mr-2" />
                 Proceed to Stage 5: DOM Mapping
             </Button>

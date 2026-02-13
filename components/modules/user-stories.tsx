@@ -5,8 +5,10 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ChevronDown, Lock, Check, AlertCircle, Zap, Download, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronRight, Lock, Check, AlertCircle, Zap, Download, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { JiraImportDialog } from '@/components/jira-import-dialog'
 import { PipelineUnified } from '@/components/modules/user-stories/pipeline'
 import { api } from '@/lib/api/client'
@@ -28,6 +30,7 @@ export function UserStoriesModule({ onModuleChange }: UserStoriesModuleProps) {
   const [showPipelineForId, setShowPipelineForId] = useState<string | null>(null)
   const [stories, setStories] = useState<UserStory[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isTurboMode, setIsTurboMode] = useState(true)
 
   useEffect(() => {
     const fetchStories = async () => {
@@ -85,6 +88,7 @@ export function UserStoriesModule({ onModuleChange }: UserStoriesModuleProps) {
           <Download className="w-4 h-4" />
           Import from Jira
         </Button>
+
       </div>
 
       {/* Stats Cards - Enhanced */}
@@ -289,55 +293,57 @@ export function UserStoriesModule({ onModuleChange }: UserStoriesModuleProps) {
                 <div className="px-5 pb-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
                   <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mb-6" />
 
-                  <div className="grid md:grid-cols-2 gap-8">
-                    {/* Left Column: Quality Gates */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-primary" />
-                        <h4 className="text-sm font-bold uppercase tracking-tight text-foreground">Quality Gates</h4>
-                      </div>
-                      <div className="grid gap-3">
-                        <GateCheck
-                          label="Requirement Specification"
-                          status={story.completeness >= 80}
-                          description="Business logic and edge cases defined"
-                        />
-                        <GateCheck
-                          label="Test Design"
-                          status={story.testCases > 0}
-                          description="Comprehensive test scenarios drafted"
-                        />
-                        <GateCheck
-                          label="Scripting"
-                          status={story.testScripts > 0}
-                          description="Playwright automation scripts verified"
-                        />
-                      </div>
+                  <div className="flex flex-col items-center justify-center py-4 space-y-6">
+                    <div className="text-center max-w-xl">
+                      <h4 className="text-sm font-bold uppercase tracking-widest text-primary mb-2 flex items-center justify-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Strategic Analysis
+                      </h4>
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        Execute advanced AI validation to refine requirements, identify edge cases, and generate comprehensive test scenarios automatically.
+                      </p>
                     </div>
 
-                    {/* Right Column: Actions & Summary */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-primary" />
-                        <h4 className="text-sm font-bold uppercase tracking-tight text-foreground">Strategic Actions</h4>
-                      </div>
-                      <div className="flex flex-col gap-3">
-                        <Button
-                          className="w-full justify-start gap-3 h-12 bg-primary hover:bg-primary/90 text-primary-foreground group overflow-hidden relative"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setShowPipelineForId(showPipelineForId === story.id ? null : story.id)
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 ease-in-out" />
-                          <Sparkles className="w-5 h-5 animate-pulse" />
-                          <div className="flex flex-col items-start text-xs">
-                            <span className="text-xs font-bold">{showPipelineForId === story.id ? 'Close Analysis' : 'Run AI Pipeline Analysis'}</span>
-                            <span className="text-[10px] opacity-70">Execute Stage 1-4 validation</span>
-                          </div>
-                        </Button>
+                    <div className="w-full max-w-md">
+                      <Button
+                        className={cn(
+                          "w-full h-16 rounded-2xl flex items-center justify-center gap-4 transition-all duration-500 overflow-hidden relative group shadow-lg",
+                          showPipelineForId === story.id
+                            ? "bg-secondary hover:bg-secondary/80 text-foreground border border-border"
+                            : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20"
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowPipelineForId(showPipelineForId === story.id ? null : story.id)
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
 
-                      </div>
+                        {showPipelineForId === story.id ? (
+                          <>
+                            <div className="p-2 rounded-xl bg-background/20">
+                              <AlertTriangle className="w-5 h-5 text-amber-500" />
+                            </div>
+                            <div className="flex flex-col items-start">
+                              <span className="text-sm font-black tracking-tight uppercase">Interrupt Analysis</span>
+                              <span className="text-[10px] opacity-70">Close active pipeline view</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="p-2 rounded-xl bg-white/20 animate-pulse">
+                              <Zap className="w-5 h-5 fill-white" />
+                            </div>
+                            <div className="flex flex-col items-start text-left">
+                              <span className="text-sm font-black tracking-tight uppercase">
+                                Run AI Pipeline Analysis
+                              </span>
+                              <span className="text-[10px] opacity-70">Execute Stages 1-4 validation</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 ml-auto opacity-50 group-hover:translate-x-1 transition-transform" />
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
 
@@ -348,6 +354,7 @@ export function UserStoriesModule({ onModuleChange }: UserStoriesModuleProps) {
                         userStoryId={story.id}
                         onModuleChange={onModuleChange}
                         activeRange={[1, 3]}
+                        isTurboMode={isTurboMode}
                         initialData={{
                           user_story: story.title,
                           detailed_description: story.description,
@@ -369,27 +376,6 @@ export function UserStoriesModule({ onModuleChange }: UserStoriesModuleProps) {
           onImport={handleImport}
         />
       )}
-    </div>
-  )
-}
-
-function GateCheck({ label, status, description }: { label: string; status: boolean; description?: string }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
-      <div className="flex flex-col">
-        <span className="text-sm font-bold text-foreground">{label}</span>
-        {description && <span className="text-[10px] text-muted-foreground">{description}</span>}
-      </div>
-      <div className={cn(
-        "p-1.5 rounded-full",
-        status ? "bg-green-500/20 text-green-500" : "bg-white/5 text-muted-foreground"
-      )}>
-        {status ? (
-          <Check className="w-3.5 h-3.5" />
-        ) : (
-          <AlertCircle className="w-3.5 h-3.5" />
-        )}
-      </div>
     </div>
   )
 }
